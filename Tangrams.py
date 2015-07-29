@@ -6,8 +6,8 @@ import copy
 import time
 
 def main():
-    num = 6
-    img = cv2.imread('Tan%i.jpg'%num)
+    num = 3
+    img = cv2.imread('Images/Tan%i.jpg'%num)
     
 
     high = {
@@ -30,6 +30,7 @@ def main():
     for color in high.keys():
         lower = np.array(low[color])
         upper = np.array(high[color])
+
         shapeMask = cv2.inRange(blur, lower, upper)
         cv2.imshow('mask', shapeMask)
         cv2.waitKey(0)
@@ -39,18 +40,11 @@ def main():
         for cont in contours:
             valid.append(cont)
 
+
+    cv2.drawContours(img, valid, -1, (125,0,0), 1)
+
     indentifyPeices(valid, img)
 
-    cv2.drawContours(img, valid, -1, (255,0,255), 2)
-
-    for cnt in valid:
-        pt1 = tuple(cnt[0][0])
-        pt2 = tuple(cnt[1][0])
-
-        cv2.circle(img, pt1, 10, (255,0,0), -1 )
-        cv2.circle(img, pt2, 10, (0,255,0), -1 )
-
-    # INCREASING INDEX IS CCW
 
     cv2.imshow('img', img)
     cv2.waitKey(0)
@@ -76,11 +70,13 @@ class Peice:
             upperLeft = getUpperLeft(self.contour)
             lowerRight = getLowerRight(self.contour)
             v1 = [1,0]
-            v2 = np.subtract(upperLeft[0], lowerRight[0])
+            v2 = np.subtract(upperLeft, lowerRight)
             return py_ang(v1,v2)-(3.0/4.0) * np.pi
         elif self.name == 'rhombus':
-            for i in range(4):
-                pass
+            rhombAcuteAngle = 0.729119
+            v1 = np.subtract(self.contour[0], self.contour[-1])[0]
+            v2 = np.subtract(self.contour[0], self.contour[1])[0]
+            return (py_ang(v1,v2))
         elif self.name == 'triangle':
             pass
 
@@ -90,9 +86,9 @@ def indentifyPeices(peices, img):
         pObjs.append(Peice(peice))
     for peice in pObjs:
         #print peice.__dict__
-        if "name" in peice.__dict__:
-            cx, cy = peice.center
-            #print peice.theta
+        if "name" in peice.__dict__ and peice.theta != None:
+            cx, cy = peice.contour[0][0]
+            print peice.theta
             cv2.ellipse(img,(int(cx),int(cy)),(20,20),0,0,peice.theta*180/np.pi,255,-1)
     return pObjs
 
@@ -157,7 +153,7 @@ def isRhombus(cont):
         if d > 0.1 * aLen[i]:
             return False
     print("romb")
-    #return True
+    return True
 
 #Decides if a contour is a Right angle Isosceles
 #assumes 3 sides
@@ -184,7 +180,7 @@ def getLowerRight(cont):
     maxVal = max(sums)
     for pt in cont:
         if sum(pt[0]) == maxVal:
-            return pt
+            return pt[0]
     return None
 
 def getUpperLeft(cont):
@@ -194,7 +190,7 @@ def getUpperLeft(cont):
     minVal = min(sums)
     for pt in cont:
         if sum(pt[0]) == minVal:
-            return pt
+            return pt[0]
     return None
 
 
