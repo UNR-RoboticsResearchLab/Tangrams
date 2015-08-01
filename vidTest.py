@@ -113,7 +113,17 @@ class Peice:
             
             return -a2
         elif self.name == 'triangle':
-            
+            d = [0,0,0]
+            for i in range(3):
+                d[i] = dist(self.contour[i], self.center)
+            rcIndex = d.index(min(d))
+            rightCorner = self.contour[rcIndex]
+            nextCorner = self.contour[(rcIndex+1)%3]
+            v1 = np.subtract(rightCorner, nextCorner)[0]
+            return - py_ang(np.asarray(xAxis), v1)
+            #TODO 
+            #TODO only giving 180deg of freedom should be 360
+            #TODO
 
     def draw(self, img):
         if "theta" in self.__dict__:
