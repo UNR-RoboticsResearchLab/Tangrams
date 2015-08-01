@@ -1,54 +1,77 @@
-#!/usr/bin/python
-
 import numpy as np
 import cv2
 import copy
 import time
+import math
 
 def main():
-    num = 11
-    img = cv2.imread('Images/Tan%i.jpg'%num)
-    
+    cap = cv2.VideoCapture(0)
 
-    high = {
-        'green':[55,63,15],
-        'yellow':[43,125,195],
-        'red':[37,50,160],
-        'blue':[85,51,51]
-    }
-    low = {
-        'green':[22,37,0],
-        'yellow':[20,106,164],
-        'red':[5,26,108],
-        'blue':[47,30,0]
-    }
+    peices = []
+    frameCount = 0
+    while(True):
+        # Capture frame-by-frame
+        ret, img = cap.read()
 
-    
-    valid = []
+        high = {
+            'green':[95,163,45],
+            'yellow':[31,200,200],
+            'red':[67,68,190],
+            'blue':[185,70,51]
+        }
+        low = {
+            'green':[22,37,0],
+            'yellow':[0,90,90],
+            'red':[5,26,108],
+            'blue':[47,30,0]
+        }
 
-    blur = cv2.blur(img, (10,10))
-    for color in high.keys():
-        lower = np.array(low[color])
-        upper = np.array(high[color])
+        
+        valid = []
+        blur = cv2.blur(img, (10,10))
+        for color in high.keys():
+            lower = np.array(low[color])
+            upper = np.array(high[color])
 
-        shapeMask = cv2.inRange(blur, lower, upper)
-        cv2.imshow('mask', shapeMask)
-        cv2.waitKey(0)
-        ret, thresh = cv2.threshold(shapeMask, 127,255,0)
-        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        contours = reduceToBlocks(contours)
-        for cont in contours:
-            valid.append(cont)
+            shapeMask = cv2.inRange(blur, lower, upper)
+            
+            cv2.imshow(color, shapeMask)
 
-
-    cv2.drawContours(img, valid, -1, (125,0,0), 1)
-
-    indentifyPeices(valid, img)
+            ret, thresh = cv2.threshold(shapeMask, 127,255,0)
+            contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = reduceToBlocks(contours)
+            for cont in contours:
+                valid.append(cont)
 
 
-    cv2.imshow('img', img)
-    cv2.waitKey(0)
-    
+        cv2.drawContours(img, valid, -1, (125,0,0), 1)
+
+        if frameCount%20 == 0:
+            peices = indentifyPeices(valid, img)
+
+        drawPieces(img, peices)
+
+
+        # Display the resulting frame
+        cv2.imshow('frame',img)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # When everything done, release the capture
+    cap.release()
+    cv2.destroyAllWindows()
+
+###########################################
+###########################################
+###########################################
+###########################################
+###########################################
+###########################################
+
+
+def drawPieces(img, peices):
+    for peice in peices:
+        peice.draw(img)
 
 class Peice:
     def __init__(self,contour):
@@ -71,7 +94,7 @@ class Peice:
             upperLeft = getUpperLeft(self.contour)
             lowerRight = getLowerRight(self.contour)
             v1 = np.subtract(upperLeft, lowerRight)
-            return py_ang(xAxis,v1)-(3.0/4.0) * np.pi
+            return -(py_ang(xAxis,v1)-(3.0/4.0) * np.pi)
         elif self.name == 'rhombus':
             rhombAcuteAngle = 0.729119
             v1 = np.subtract(self.contour[0], self.contour[-1])[0]
@@ -88,20 +111,28 @@ class Peice:
                 spin = "CW"
             a2 = py_ang(xAxis, v2)
             
-            return a2
+            return -a2
         elif self.name == 'triangle':
-            pass
+            
+
+    def draw(self, img):
+        if "theta" in self.__dict__:
+            cx, cy = self.center
+            if self.theta == None: self.theta = np.pi
+            cv2.ellipse(img,(int(cx),int(cy)),(20,20),0,0,self.theta*180/np.pi,(0,0,255),-1)
+
 
 def indentifyPeices(peices, img):
     pObjs = []
     for peice in peices:
         pObjs.append(Peice(peice))
-    for peice in pObjs:
+    '''for peice in pObjs:
         #print peice.__dict__
         if "name" in peice.__dict__ and peice.theta != None:
             cx, cy = peice.contour[0][0]
             print peice.theta, peice.name
             cv2.ellipse(img,(int(cx),int(cy)),(20,20),0,0,peice.theta*180/np.pi,255,-1)
+    '''
     return pObjs
 
 #Returns a tuple of the contours center coords
@@ -175,6 +206,9 @@ def isRightIsosceles(cont):
     #sLen is scaled Lengths
     sLen = [i/shortest for i in aLen]
     sLen.sort()
+    rt2 = math.sqrt(2)
+    if sLen[1] - 1.0 < 0.1 and abs(sLen[2]-rt2) < 0.1:
+        return True
 
 
 def getSideLengths(cont):
