@@ -13,46 +13,19 @@ def main():
         # Capture frame-by-frame
         ret, img = cap.read()
 
-        high = {
-            'green':[95,163,45],
-            'yellow':[31,200,200],
-            'red':[67,68,190],
-            'blue':[185,70,51]
-        }
-        low = {
-            'green':[22,37,0],
-            'yellow':[0,90,90],
-            'red':[5,26,108],
-            'blue':[47,30,0]
-        }
-
-        
-        valid = []
-        blur = cv2.blur(img, (10,10))
-        for color in high.keys():
-            lower = np.array(low[color])
-            upper = np.array(high[color])
-
-            shapeMask = cv2.inRange(blur, lower, upper)
-            
-            cv2.imshow(color, shapeMask)
-
-            ret, thresh = cv2.threshold(shapeMask, 127,255,0)
-            contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            contours = reduceToBlocks(contours)
-            for cont in contours:
-                valid.append(cont)
-
-
-        cv2.drawContours(img, valid, -1, (125,0,0), 1)
+        valid = findValid(img)
 
         if frameCount%20 == 0:
             peices = indentifyPeices(valid, img)
 
-        drawPieces(img, peices)
+        blank = np.zeros(img.shape)
+
+        drawPieces(blank, peices)
+        #drawPieces(img, peices)
 
 
         # Display the resulting frame
+        cv2.imshow('blank', blank)
         cv2.imshow('frame',img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -67,6 +40,39 @@ def main():
 ###########################################
 ###########################################
 ###########################################
+
+
+#TODO COMMENT
+def findValid(img):
+    high = {
+        'green':[95,163,45],
+        'yellow':[31,200,200],
+        'red':[67,68,190],
+        'blue':[185,70,51]
+    }
+    low = {
+        'green':[22,37,0],
+        'yellow':[0,90,90],
+        'red':[5,26,108],
+        'blue':[47,30,0]
+    }
+
+    valid = []
+    blur = cv2.blur(img, (10,10))
+    for color in high.keys():
+        lower = np.array(low[color])
+        upper = np.array(high[color])
+
+        shapeMask = cv2.inRange(blur, lower, upper)
+        
+        #cv2.imshow(color, shapeMask)
+
+        ret, thresh = cv2.threshold(shapeMask, 127,255,0)
+        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours = reduceToBlocks(contours)
+        for cont in contours:
+            valid.append(cont)
+    return valid
 
 
 def drawPieces(img, peices):
@@ -88,61 +94,72 @@ class Peice:
         if "name" in self.__dict__:
             self.theta = self.findAngleFromXaxis()
         
+    #TODO COMMENT THIS FUNCTION
     def findAngleFromXaxis(self):
         xAxis = [1,0]
         if self.name == 'square':
             upperLeft = getUpperLeft(self.contour)
             lowerRight = getLowerRight(self.contour)
             v1 = np.subtract(upperLeft, lowerRight)
-            return -(py_ang(xAxis,v1)-(3.0/4.0) * np.pi)
+            ang = (py_ang(xAxis,v1)+0.75*np.pi)
+            if ang > 0:
+                ang -= np.pi/2
+            return ang
         elif self.name == 'rhombus':
             rhombAcuteAngle = 0.729119
             v1 = np.subtract(self.contour[0], self.contour[-1])[0]
             v2 = np.subtract(self.contour[0], self.contour[1])[0]
+            d1 = dist(self.contour[0], self.contour[-1])
+            d2 = dist(self.contour[0], self.contour[1])
             a1 = py_ang(v1,v2)
-            if abs(abs(a1)-(np.pi/4.0)) < 0.09:
-                pass#print "tiny corner"
-            else:
-                pass#print "big corner"
             spin = ""
-            if a1 > 0:
-                spin = "CCW"
+            if d1-d2 > 0:
+                self.spin = "CCW"
             else:
-                spin = "CW"
+                self.spin = "CW"
             a2 = py_ang(xAxis, v2)
-            
-            return -a2
+            if self.spin == "CW":
+                a2 += 0.75 * np.pi
+            if a2 < -np.pi/2:
+                a2 += np.pi
+            return a2
         elif self.name == 'triangle':
             d = [0,0,0]
             for i in range(3):
                 d[i] = dist(self.contour[i], self.center)
             rcIndex = d.index(min(d))
+            self.rcIndex = rcIndex
             rightCorner = self.contour[rcIndex]
             nextCorner = self.contour[(rcIndex+1)%3]
             v1 = np.subtract(rightCorner, nextCorner)[0]
-            return - py_ang(np.asarray(xAxis), v1)
-            #TODO 
-            #TODO only giving 180deg of freedom should be 360
-            #TODO
+            ang = py_ang(np.asarray(xAxis), v1)-np.pi
+            mag = abs(ang)
+            sign = ang/mag
+            ang = mag%(2*np.pi)
+            ang *= sign
+            return ang
 
+
+    #Draws this shape onto the given img
     def draw(self, img):
+
+        cv2.drawContours(img, [self.contour], -1, (125,0,0), 1)
         if "theta" in self.__dict__:
             cx, cy = self.center
             if self.theta == None: self.theta = np.pi
-            cv2.ellipse(img,(int(cx),int(cy)),(20,20),0,0,self.theta*180/np.pi,(0,0,255),-1)
+            cv2.ellipse(img,(int(cx),int(cy)),(10,10),0,0,self.theta*180/np.pi,(0,0,255),-1)
+            '''
+            if self.name == "rhombus":
+                cv2.circle(img, tuple(self.contour[0][0]), 10, (255,0,0), -1)
+                cv2.circle(img, tuple(self.contour[1][0]), 10, (255,0,0), -1)
+            '''
+
 
 
 def indentifyPeices(peices, img):
     pObjs = []
     for peice in peices:
         pObjs.append(Peice(peice))
-    '''for peice in pObjs:
-        #print peice.__dict__
-        if "name" in peice.__dict__ and peice.theta != None:
-            cx, cy = peice.contour[0][0]
-            print peice.theta, peice.name
-            cv2.ellipse(img,(int(cx),int(cy)),(20,20),0,0,peice.theta*180/np.pi,255,-1)
-    '''
     return pObjs
 
 #Returns a tuple of the contours center coords
@@ -154,16 +171,20 @@ def getCenter(contour):
 
 #reduces contours to the actual number of stickers identified
 def reduceToBlocks(contours):
-    
     valid = []
+    #Approximate a polygon for each contour
     for cont in contours:
         eps = 0.05 * cv2.arcLength(cont, True)
         approx = cv2.approxPolyDP(cont, eps, True)
-        #if len(approx) == 4:
-        valid.append(approx)
+        #make sure the polygon approximated has 3 or 4 sides
+        size = len(approx)
+        if size == 3 or size == 4:
+            valid.append(approx)
     
     contours = copy.copy(valid)
     valid = []
+
+    #Make sure the area of the contour is roughly the correct size
     for cont in contours:
         area = cv2.contourArea(cont)
         if area > 100 and area < 100000:
@@ -175,12 +196,16 @@ def reduceToBlocks(contours):
 def dist(a,b):
     return np.linalg.norm(a-b)
 
-#Found this
 def py_ang(v1, v2):
     """ Returns the angle in radians between vectors 'v1' and 'v2'    """
     cosang = np.dot(v1, v2)
-    sinang = np.linalg.norm(np.cross(v1, v2))
-    return np.arctan2(sinang, cosang)
+    sinang = np.cross(v1, v2)
+    ang = np.arctan2(sinang, cosang)
+    if ang >= np.pi:
+        ang -= 2*np.pi
+    elif ang <= -np.pi:
+        ang += 2*np.pi
+    return ang
 
 def isSquare(cont):
     if len(cont) != 4:
