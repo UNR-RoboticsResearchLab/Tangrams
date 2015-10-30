@@ -49,10 +49,10 @@ def writeStateToFile( pieces, connections ):
     outfile = open( "state_" + currentTime, 'w+' )
     for piece in pieces:
         print "meow"
-        outfile.write(piece.toString() + '\n')
+        outfile.write(str(piece) + '\n')
     outfile.write('\n')
     for connection in connections:
-        outfile.write(connection.toString() + '\n')
+        outfile.write(str(connection) + '\n')
 
     outfile.close()
 
