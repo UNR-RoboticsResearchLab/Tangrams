@@ -4,7 +4,7 @@ import datetime
 from Tangrams import *
 
 def main():
-    cap = cv2.VideoCapture( 0 )
+    cap = cv2.VideoCapture( 1 )
 
     pieces = []
     connections = []
@@ -13,25 +13,25 @@ def main():
         # Capture frame-by-frame
         ret, img = cap.read()
 
-        if frameCount%20 == 0:
-            valid = findValid(img)
-            pieces = indentifyPieces(valid, img)
-            connections = findConnections(pieces)
+        # if(frameCount%20 == 0):
+        #     valid = findValid(img)
+        #     pieces = indentifyPieces(valid, img)
+        #     connections = findConnections(pieces)
 
-        blank = np.zeros( img.shape )
+        blank = np.zeros(img.shape)
 
-        drawPieces( blank, pieces )
+        drawPieces(blank, pieces)
         drawConnections(img, connections)
 
 
         # Display the resulting frame
-        cv2.imshow( 'blank', blank )
-        cv2.imshow( 'frame', img )
-        currentWaitKey = cv2.waitKey( 1 ) & 0xFF
-        if currentWaitKey == ord( 'q' ):
+        cv2.imshow('blank', blank)
+        cv2.imshow('frame', img)
+        currentWaitKey = cv2.waitKey(1) & 0xFF
+        if(currentWaitKey == ord('q')):
             break
-        if currentWaitKey == ord( 'r' ):
-            writeStateToFile( pieces, connections )
+        if(currentWaitKey == ord('r')):
+            writeStateToFile(pieces, connections)
 
     # When everything is done, release the capture
     cap.release()
@@ -44,11 +44,11 @@ def main():
 ###########################################
 ###########################################
 
-def writeStateToFile( pieces, connections ):
+#TODO REMOVE? Probably not needed.
+def writeStateToFile(pieces, connections):
     currentTime = str( datetime.datetime.now() )[:-7]
-    outfile = open( "state_" + currentTime, 'w+' )
+    outfile = open("state_" + currentTime, 'w+')
     for piece in pieces:
-        print "meow"
         outfile.write(str(piece) + '\n')
     outfile.write('\n')
     for connection in connections:

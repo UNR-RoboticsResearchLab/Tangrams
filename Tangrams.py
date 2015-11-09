@@ -6,11 +6,16 @@ import copy
 import time
 import math
 
-NON_CONNECTION = 0
-SIDE_SIDE = 1
-SIDE_POINT = 2
-POINT_POINT = 3
+NON_CONNECTION = -1
+SIDE_SIDE = 0
+SIDE_POINT = 1
+POINT_POINT = 2
 
+MAX_POINT_POINT_DIST = 25
+MAX_SIDE_CENTER_DIST = 20
+MAX_POINT_SIDE_DIST = 20
+MAX_CENTER_DIST = 50
+MAX_ANG_DIFF = 0.5
 
 class Connection:
 
@@ -18,92 +23,148 @@ class Connection:
         self.pieces = [piece1, piece2]
         self.determineConnectionType()
 
-    #TODO COMMENT / IMPROVE
+    #Determines the type of connection this is.
     def determineConnectionType(self):
+        #Innocent of connection-ness until proven connected.
         self.connectionType = NON_CONNECTION
         #Loop for each side of the first piece.
         for side in self.pieces[0].sides:
-            #Loop for each side in the second piece.
+            #Looking for SIDE_SIDE
             for otherSide in self.pieces[1].sides:
-                if side.isParallel(otherSide):
-                    #Distance from other center to side
-                    d1 = side.distanceTo(otherSide.center)
-                    #Distance from other side to center
-                    d2 = otherSide.distanceTo(side.center)
-                    #Distance between centers
-                    dCenters= dist(side.center, otherSide.center)
-                    if d1 < 20 and d2 < 20 and dCenters <= 50:
-                        self.connectionType = SIDE_SIDE
-                        self.touching = [side, otherSide]
-                        return
-            #Loop for each point in the second piece.
+                if( self.isSideSideConnection(side, otherSide) ):
+                    self.connectionType = SIDE_SIDE
+                    self.touching = [side, otherSide]
+                    #Retrieve and store location numbers.
+                    self.locationNumbers = [
+                        self.pieces[0].getLocationNumber(side),
+                        self.pieces[1].getLocationNumber(otherSide)
+                    ]
+                    # print("Location numbers SIDE_SIDE")
+                    # print( self.locationNumbers )
+                    return
+
+            #Looking for SIDE_POINT
             for otherPoint in self.pieces[1].contour:
-                #distance from point to line
-                d1 = side.distanceTo(otherPoint)
-                #distance from point to center of line
-                d2 = dist(otherPoint, side.center)
-                if d1 < 20 and d2 < side.length/2.0 :
+                if( self.isSidePointConnection(side, otherPoint) ):
                     self.connectionType = SIDE_POINT
                     self.touching = [Point(otherPoint), side]
+                    #Retrieve and store location numbers.
+                    self.locationNumbers = [
+                        self.pieces[0].getLocationNumber(side),
+                        self.pieces[1].getLocationNumber(otherPoint)
+                    ]
+                    # print("Location numbers SIDE_POINT")
+                    # print( self.locationNumbers )
                     return
+
         #Loop for each point in the first piece.
         for point in self.pieces[0].contour:
-            #Loop for point in the second piece.
+            #Looking for POINT_POINT connection.
             for otherPoint in self.pieces[1].contour:
-                #distance between points
-                distance = dist(point[0], otherPoint[0])
-                if distance < 25:
+                if( self.isPointPointConnection(point, otherPoint) ):
                     self.connectionType = POINT_POINT
                     self.touching = [Point(point), Point(otherPoint)]
+                    #Retrieve and store location numbers.
+                    self.locationNumbers = [
+                        self.pieces[0].getLocationNumber(point),
+                        self.pieces[1].getLocationNumber(otherPoint)
+                    ]
+                    # print("Location numbers POINT_POINT")
+                    # print( self.locationNumbers )
                     return
-            #Loop for each side in the second piece.
+
+            #Looking for a SIDE_POINT connection.
             for otherSide in self.pieces[1].sides:
-                #distance from point to line
-                d1 = otherSide.distanceTo(point)
-                #distance from point to center of line
-                d2 = dist(point, otherSide.center)
-                if d1 < 20 and d2 < otherSide.length/2.0 :
+                if( self.isSidePointConnection(otherSide, point) ):
                     self.connectionType = SIDE_POINT
                     self.touching = [Point(point), otherSide]
+                    #Retrieve and store location numbers.
+                    self.locationNumbers = [
+                        self.pieces[0].getLocationNumber(point),
+                        self.pieces[1].getLocationNumber(otherSide)
+                    ]
+                    # print("Location numbers POINT_SIDE")
+                    # print( self.locationNumbers )
                     return
 
     #Draws the connection to the given image.
     def draw(self, img):
         drawColors = {
-                    SIDE_SIDE: (255, 0, 0),
-                    SIDE_POINT: (0, 255, 0),
-                    POINT_POINT: (0, 0, 255)
-                    }
+            SIDE_SIDE: (255, 0, 0),
+            SIDE_POINT: (0, 255, 0),
+            POINT_POINT: (0, 0, 255)
+        }
         color = drawColors[self.connectionType]
         self.touching[0].draw(img, color)
         self.touching[1].draw(img, color)
 
+    def isPointPointConnection(self, point1, point2):
+        #distance between points
+        distance = dist(point1[0], point2[0])
+        if(distance < MAX_POINT_POINT_DIST):
+            return True
+        return False
+
+    def isSidePointConnection(self, side, point):
+        #Distance from point to side.
+        distPointSide = side.distanceTo(point)
+        #Distance from point to center of the side.
+        distPointSidesCenter = dist(point, side.center)
+
+        if(     distPointSide < MAX_POINT_SIDE_DIST
+            and distPointSidesCenter < side.length / 2.0
+            ):
+            return True
+        return False
+
+    def isSideSideConnection(self, side1, side2):
+        if side1.isParallel(side2):
+            #Distance from other center to side
+            distCenterSide = side1.distanceTo(side2.center)
+            #Distance from other side to center
+            distSideCenter = side2.distanceTo(side1.center)
+            #Distance between centers
+            distBetweenCenters= dist(side1.center, side2.center)
+
+            if(     distCenterSide < MAX_SIDE_CENTER_DIST
+                and distSideCenter < MAX_SIDE_CENTER_DIST 
+                and distBetweenCenters < MAX_CENTER_DIST
+                ):
+                return True
+        return False
+
     def isSimilar(self, other):
         #Same connection type.
         if(self.connectionType == other.connectionType):
-            if( 
-                (   #self first matches other first.
-                    self.pieces[0].name == other.pieces[0].name
-                    and
-                    #self second matches other second.
-                    self.pieces[1].name == other.pieces[1].name
-                )
-                or
-                (   #self first matches other second.
-                    self.pieces[0].name == other.pieces[1].name
-                    and
-                    #self second matches other first.
-                    self.pieces[1].name == other.pieces[0].name
-                )
-               ):
+            if(     (   #self first matches other first.
+                        self.pieces[0].name == other.pieces[0].name
+                        #self second matches other second. 
+                    and self.pieces[1].name == other.pieces[1].name
+                        #has same side/corner numbers
+                    and self.hasSameLocationNumbers(other, 0, 0)
+                    and self.hasSameLocationNumbers(other, 1, 1)
+                    )
+                or  (   #self first matches other second.
+                        self.pieces[0].name == other.pieces[1].name
+                        #self second matches other first.
+                    and self.pieces[1].name == other.pieces[0].name
+                        #has same side/corner numbers
+                    and self.hasSameLocationNumbers(other, 0, 1)
+                    and self.hasSameLocationNumbers(other, 1, 0)
+                    )
+                ):
                 return True
         return False
+
+    def hasSameLocationNumbers(self, other, selfIndex, otherIndex):
+        return(     self.locationNumbers[selfIndex]
+                == other.locationNumbers[otherIndex] )
 
     def __str__(self):
         string = ""
         ConnectionTypes = {
-            SIDE_SIDE: "SIDE-SIDE",
-            SIDE_POINT: "SIDE-POINT",
+            SIDE_SIDE: "SIDE_SIDE",
+            SIDE_POINT: "SIDE_POINT",
             POINT_POINT: "POINT_POINT"
         }
         string = ConnectionTypes[self.connectionType] + '\n'
@@ -157,6 +218,7 @@ class Line:
         return str( np.asarray(self.pts))
 
 class Piece:
+
     def __init__(self, contour):
         self.contour = contour
         self.center = getCenter(contour)
@@ -166,80 +228,91 @@ class Piece:
 
         #Determines the name of the piece.
         if (len(contour) == 4):
-            if isSquare(contour):
+            if self.isSquare():
                 self.name = 'square'
-            elif isParallelogram(contour):
+            elif self.isParallelogram():
                 self.name = 'parallelogram'
         elif(len(contour)== 3):
-            if isRightIsosceles(contour):
+            if self.isRightIsosceles():
                 self.name = 'triangle'
 
         if "name" in self.__dict__:
             self.theta = self.findAngleFromXaxis()
-        
+
     #Finds the angle form the x - axis.
     def findAngleFromXaxis(self):
         xAxis = [1, 0]
         ### SQUARE ###
         if self.name == 'square':
-            upperLeft = getUpperLeft(self.contour)
-            lowerRight = getLowerRight(self.contour)
-            #Vector from upper-left to lower-right
-            diagonal = np.subtract(upperLeft, lowerRight)
-            # The angle is adjusted by 0.75*PI to give us the angle of the
-            # 'topside' from the x-axis.
-            ang = (angleBetween(xAxis, diagonal) + 0.75 * np.pi)
-            # Adjust the angle to account for symmetry of square.
-            if ang > 0:
-                ang -= np.pi / 2
-            return ang
+            return self.findSquareAngleFromAxis()
         ### PARALLELOGRAM ###
         elif self.name == 'parallelogram':
-            # Assumes a parallelogram with a small angle of PI/4
-            #v1 and v2 are the vectors from the '0' along the edges of the piece.
-            v1 = np.subtract(self.contour[0], self.contour[-1])[0]
-            v2 = np.subtract(self.contour[0], self.contour[1])[0]
-            # d1 and d2 are the magnitudes of the vectors v1 and v2 respectively.
-            d1 = dist(self.contour[0], self.contour[-1])
-            d2 = dist(self.contour[0], self.contour[1])
-            a2 = angleBetween(xAxis, v2)
-
-            # Determines the spin of parallelogram.
-            if d1 - d2 > 0:
-                self.spin = "CCW"
-            else:
-                self.spin = "CW"
-
-            # Makes appropriate correction for symmetry and spin.
-            if self.spin == "CW":
-                a2 += 0.75 * np.pi
-            if a2 < -np.pi / 2:
-                a2 += np.pi
-            return a2
-
+            return self.findParallelogramAngleFromAxis()
         ### TRIANGLE ###
         elif self.name == 'triangle':
-            distancesFromCenter = [0, 0, 0]
+            return self.findTriangleAngleFromAxis()
 
-            # Determine the distances from corner to center.
-            # The smallest of these must be the corner that is a right triangle.
-            # Assumes a right isosceles triangle.
-            for i in range(3):
-                distancesFromCenter[i] = dist(self.contour[i], self.center)
-            rcIndex = distancesFromCenter.index(min(distancesFromCenter))
-            self.rcIndex = rcIndex
-            rightCorner = self.contour[rcIndex]
-            nextCorner = self.contour[(rcIndex + 1) % 3]
+    def findSquareAngleFromAxis(self):
+        xAxis = [1, 0]
+        upperLeft = getUpperLeft(self.contour)
+        lowerRight = getLowerRight(self.contour)
+        #Vector from upper-left to lower-right
+        diagonal = np.subtract(upperLeft, lowerRight)
+        # The angle is adjusted by 0.75*PI to give us the angle of the
+        # 'topside' from the x-axis.
+        ang = (angleBetween(xAxis, diagonal) + 0.75 * np.pi)
+        # Adjust the angle to account for symmetry of square.
+        if ang > 0:
+            ang -= np.pi / 2
+        return ang
 
-            # v1 is the vector between the right-angled corner and it's clockwise? neighbor.
-            v1 = np.subtract(rightCorner, nextCorner)[0]
-            ang = angleBetween(np.asarray(xAxis), v1) - np.pi
-            mag = abs(ang)
-            sign = ang / mag
-            ang = mag % (2 * np.pi)
-            ang *= sign
-            return ang
+    def findParallelogramAngleFromAxis(self):
+        xAxis = [1, 0]
+        # Assumes a parallelogram with a small angle of PI/4
+        #v1 and v2 are the vectors from the '0' along the edges of the piece.
+        v1 = np.subtract(self.contour[0], self.contour[-1])[0]
+        v2 = np.subtract(self.contour[0], self.contour[1])[0]
+        # d1 and d2 are the magnitudes of the vectors v1 and v2 respectively.
+        d1 = dist(self.contour[0], self.contour[-1])
+        d2 = dist(self.contour[0], self.contour[1])
+        a2 = angleBetween(xAxis, v2)
 
+        # Determines the spin of parallelogram.
+        if d1 - d2 > 0:
+            self.spin = "CCW"
+        else:
+            self.spin = "CW"
+
+        # Makes appropriate correction for symmetry and spin.
+        if self.spin == "CW":
+            a2 += 0.75 * np.pi
+        if a2 < -np.pi / 2:
+            a2 += np.pi
+        return a2
+
+    def findTriangleAngleFromAxis(self):
+        xAxis = [1, 0]
+        distancesFromCenter = [0, 0, 0]
+
+        # Determine the distances from corner to center.
+        # The smallest of these must be the corner that is a right triangle.
+        # Assumes a right isosceles triangle.
+        for i in range(3):
+            distancesFromCenter[i] = dist(self.contour[i], self.center)
+        rcIndex = distancesFromCenter.index(min(distancesFromCenter))
+        self.rcIndex = rcIndex
+        rightCorner = self.contour[rcIndex]
+        nextCorner = self.contour[(rcIndex + 1) % 3]
+
+        # v1 is the vector between the right-angled corner and it's
+        # clockwise? neighbor.
+        v1 = np.subtract(rightCorner, nextCorner)[0]
+        ang = angleBetween(np.asarray(xAxis), v1) - np.pi
+        mag = abs(ang)
+        sign = ang / mag
+        ang = mag % (2 * np.pi)
+        ang *= sign
+        return ang
 
     #Draws this shape onto the given img
     def draw(self, img):
@@ -266,11 +339,161 @@ class Piece:
             '''
 
     def __str__(self):
-        string = self.name + " "
-        string += str(round(self.theta, 2)) + " "
-        string += str(round(self.center[0],2)) + " "
-        string += str(round(self.center[1],2))
+        string = str(round(self.theta, 2)) + " "
+        string += str(round(self.center[0], 2)) + " "
+        string += str(round(self.center[1], 2))
         return string
+
+    def getAngleAtVertex(self, vertex):
+        vertexIndex = self.getIndexOfVertex(vertex)
+        #Get neighbors' index.
+        previousNeighbor = (vertexIndex - 1) % len(self.contour)
+        nextNeighbor = (vertexIndex + 1) % len(self.contour)
+        #Get vectors to neighbors.
+        toPreviousNeighbor = (self.contour[previousNeighbor] - vertex)[0];
+        toNextNeighbor = (self.contour[nextNeighbor] - vertex)[0];
+        #Return angle between neighbors.
+        return angleBetween(toPreviousNeighbor, toNextNeighbor)
+
+    def getIndexOfVertex(self, vertex):
+        for i in range(len(self.contour)):
+            if all( (self.contour[i] == vertex)[0]):
+                return i
+
+    def getLocationNumber(self, contact):
+        ### SQUARE ###
+        if self.name == 'square':
+            # print "getting locationNumbers of square"
+            #Returns -1 because which point doesn't matter on a square.
+            return -1
+        ### PARALLELOGRAM ###
+        elif self.name == 'parallelogram':
+            # print "getting locationNumbers of parallelogram"
+            return self.getLocationNumberOfParallelogram(contact)
+        ### TRIANGLE ###
+        elif self.name == 'triangle':
+            # print "getting locationNumbers of triangle"
+            return self.getLocationNumberOfTriangle(contact)
+    
+    def getLocationNumberOfParallelogram(self, contact):
+        locationNum = None
+        
+        if(isinstance(contact, Line)):
+            #Calculate line Nums for CW
+            sideLengths = self.getSideLengths()
+            sideLengths.sort()
+
+            if( contact.length in sideLengths[:2] ):
+                locationNum = 1
+            else:
+                locationNum = 2
+
+            if self.spin != "CW":
+                locationNum += 2
+
+            return locationNum
+        else:
+            #Calculate point Nums for CW
+            vertexAngles = self.getVertexAngles()
+            vertexAngles.sort()
+            contactAngle = self.getAngleAtVertex(contact)
+
+            if( contactAngle in vertexAngles[:2] ):
+                locationNum = 1
+            else:
+                locationNum = 2
+
+            if self.spin != "CW":
+                locationNum += 2
+
+            return locationNum
+
+    def getLocationNumberOfTriangle(self, contact):
+        if(isinstance(contact, Line)):
+            #Calculate line NUMS for Triangle
+            sideLengths = self.getSideLengths()
+            largestSideIndex = sideLengths.index(max(sideLengths))
+            #Mod 3 to loop around triangle if out of bounds.
+            largesstSideNeighborIndex = (largestSideIndex + 1) % 3;
+            if(contact.length == sideLengths[largestSideIndex]):
+                return 1
+            elif(contact.length == sideLengths[largesstSideNeighborIndex]):
+                return 2
+            else:
+                return 3
+
+        else:
+            #Calculate point NUMS for Triangle
+            vertexIndex = self.getIndexOfVertex(contact)
+            #Mod 3 to loop around the triangle if index gets too large.
+            nextVertexIndex = (vertexIndex + 1) % 3
+            vertexAngles = self.getVertexAngles()
+            #TODO Maybe go and make an AngleCloseEnough Function?
+            if(abs(0.5*np.pi - vertexAngles[vertexIndex]) < MAX_ANG_DIFF):
+                return 1
+            elif(abs(0.5*np.pi-vertexAngles[nextVertexIndex]) < MAX_ANG_DIFF):
+                return 2
+            else:
+                return 3
+
+    def getVertexAngles(self):
+        vertexAngles = []
+        for i in range(len(self.contour)):
+            angle = self.getAngleAtVertex(self.contour[i])
+            vertexAngles.append(angle)
+        return vertexAngles
+
+    #Returns a list of lengths of each side of the given contour.
+    def getSideLengths(self):
+        sideLengths = []
+        for i in range(len(self.contour)):
+            length = dist(self.contour[i],
+                          self.contour[(i + 1) % len(self.contour)])
+            sideLengths.append(length)
+        return sideLengths
+
+    #Decides if a contour is a Right angle Isosceles
+    def isRightIsosceles(self):
+        #Assumes 3 sides.
+        #aLen is actual Lengths
+        aLen = self.getSideLengths()
+        shortest = min(aLen)
+        #sLen is scaled Lengths
+        sLen = [i / shortest for i in aLen]
+        sLen.sort()
+        rt2 = math.sqrt(2)
+        if sLen[1] - 1.0 < 0.1 and abs(sLen[2] - rt2) < 0.1:
+            return True
+
+    #Decides if the given contour is a square.
+    def isSquare(self):
+        if len(self.contour) != 4:
+            return False
+        for i in range(4):
+            #Pick three corners.
+            p1 = (self.contour[i])
+            p2 = (self.contour[(i + 1) % 4])
+            p3 = (self.contour[(i + 2) % 4])
+            #Find lengths of sides.
+            l1 = dist(p1, p2)
+            l2 = dist(p2, p3)
+            #Vectors from middle point to neighbors.
+            v1 = np.subtract(p2, p1)
+            v2 = np.subtract(p2, p3)
+            theta = angleBetween(v1[0], v2[0])
+            if abs(l2 - l1) > .1 * l1 and abs(theta - np.pi / 2) > 0.1:
+                return False
+        return True
+
+    #Decides if the piece is a parallelogram.
+    def isParallelogram(self):
+        #Makes the assumptions of 4 sides and not a square.
+        aLen = self.getSideLengths()
+        for i in range(2):
+            d = abs(aLen[i] - aLen[i + 2])
+            if d > 0.1 * aLen[i]:
+                return False
+        return True
 
 def drawConnections(img, connections):
     for connection in connections:
@@ -338,7 +561,8 @@ def findValid(img):
         #cv2.imshow(color, shapeMask)
 
         ret, thresh = cv2.threshold(shapeMask, 127, 255, 0)
-        _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE,
+                                         cv2.CHAIN_APPROX_SIMPLE)
         contours = reduceToBlocks(contours)
         for cont in contours:
             valid.append(cont)
@@ -418,57 +642,6 @@ def angleBetween(v1, v2):
     elif ang <= -np.pi:
         ang += 2 * np.pi
     return ang
-
-#Decides if the given contour is a square.
-def isSquare(cont):
-    if len(cont) != 4:
-        return False
-    for i in range(4):
-        #Pick three corners.
-        p1 = (cont[i])
-        p2 = (cont[(i + 1) % 4])
-        p3 = (cont[(i + 2) % 4])
-        #Find lengths of sides.
-        l1 = dist(p1, p2)
-        l2 = dist(p2, p3)
-        #Vectors from middle point to neighbors.
-        v1 = np.subtract(p2, p1)
-        v2 = np.subtract(p2, p3)
-        theta = angleBetween(v1[0], v2[0])
-        if abs(l2 - l1) > .1 * l1 and abs(theta - np.pi / 2) > 0.1:
-            return False
-    return True
-
-#Decides if a contour is a parallelogram.
-#Makes the assumptions of 4 sides and not a square.
-def isParallelogram(cont):
-    aLen = getSideLengths(cont)
-    for i in range(2):
-        d = abs(aLen[i] - aLen[i + 2])
-        if d > 0.1 * aLen[i]:
-            return False
-    return True
-
-#Decides if a contour is a Right angle Isosceles
-#Assumes 3 sides.
-def isRightIsosceles(cont):
-    #aLen is actual Lengths
-    aLen = getSideLengths(cont)
-    shortest = min(aLen)
-    #sLen is scaled Lengths
-    sLen = [i / shortest for i in aLen]
-    sLen.sort()
-    rt2 = math.sqrt(2)
-    if sLen[1] - 1.0 < 0.1 and abs(sLen[2] - rt2) < 0.1:
-        return True
-
-#Returns a list of lengths of each side of the given contour.
-def getSideLengths(cont):
-    sideLengths = []
-    for i in range(len(cont)):
-        length = dist(cont[i], cont[(i + 1) % len(cont)])
-        sideLengths.append(length)
-    return sideLengths
 
 #Returns the lowest right most corner by comparing the sum of x and y positions.
 def getLowerRight(cont):

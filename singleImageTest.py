@@ -18,19 +18,6 @@ def main():
 
     graphTest(f, g)
 
-    '''
-    #Create blank image to draw on.
-    blank = np.zeros(img.shape)
-
-    #Draw pieces and connections.
-    drawPieces(blank, pieces)
-    drawConnections(img, connections)
-
-
-    # Display the resulting images.
-    cv2.imshow('blank', blank)
-    cv2.imshow('frame', img)
-    '''
     cv2.waitKey(0)
 
     # When everything is done, shutdown.
@@ -76,7 +63,7 @@ def graphTest(f, g):
     if f == g:
         print("They match.")
     else:
-        print("No match.")
+        print("They don't match.")
 
 
 

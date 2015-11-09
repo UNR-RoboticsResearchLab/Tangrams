@@ -5,7 +5,6 @@ import Tangrams
 #################################################
 
 
-
 class TangramsGraph:
 
     def __init__(self,toCopy = None):
@@ -29,26 +28,25 @@ class TangramsGraph:
         self.pieces[piece2].append(connection)
 
     def __eq__(self, other):
-        return self.countsMatch(other) 
+        return self.countsMatch(other)
 
     """ countsMatch Description:
         Check to make sure each connection has a match on the other graph that
         has the same types of pieces connected, each connected piece with the
         same number of connections to the correct types.
-    """
+        """
     def countsMatch(self, other):
         """NOTES:
-            Still fails if a peice is connected with the correct type of
-            connection to the correct peice but with the wrong side/point.
+            Still fails if a piece is connected with the correct type of
+            connection to the correct piece but with the wrong side/point.
 
             Uses while loops because things are being removed mid loop. Using
             for loops in this scenario leads to 
-        """
+            """
 
         #Check to make sure graphs have same number of connections & pieces.
-        if(
-            len(self.connections) != len(other.connections) or
-            len(self.pieces) != len(other.pieces)
+        if(     len(self.connections) != len(other.connections)
+            or  len(self.pieces) != len(other.pieces)
            ):
             return False
 
@@ -60,7 +58,6 @@ class TangramsGraph:
         #Loop over all connections in 
         selfIndex = 0
         while(selfIndex < len(connections)):
-            print(selfIndex)
             #The current connection in self being paired.
             connection = connections.keys()[selfIndex]
 
@@ -101,14 +98,14 @@ class TangramsGraph:
                     break
 
                 otherIndex += 1
-            #Quit if no pair was found for current peice
+            #Quit if no pair was found for current piece
             if(not pairFound):
-                print("no pair found for " + connection)
+                #print("no pair found for " + str(connection))
                 return False
 
             selfIndex += 1
-        print("First Graph unmatched" + str(connections.keys()))
-        print("Second Graph unmatched" + str(otherConnections.keys()))
+        #print("First Graph unmatched" + str(connections.keys()))
+        #print("Second Graph unmatched" + str(otherConnections.keys()))
 
         return True
 
@@ -119,9 +116,10 @@ class TangramsGraph:
             return True
         return False
 
+    #Returns the number of pieces of each type that it is connected to.
     def getPieceCounts(self, piece):
-        pass
-
+        return TangramsGraphCounts(self, piece)
+    
     def display(self):
         print ("\nConnections")
         self.printConnections()
@@ -146,8 +144,42 @@ class TangramsGraph:
                 string = str(connection)
                 print(string)
 
+#Container for the counts of connection and piece type from the given piece.
+class TangramsGraphCounts:
+
+    def __init__(self, graph, piece):
+        '''NOTES
+            'piece in self.pieces' does not return true even if piece is in
+            the pieces dict. I think this is from the deepcopy that is done in
+            the countsMatch function, but I need that to be able to remove the
+            connections from the list without destroying the original data.
+            Becuase of the above I've come up with the solution you see below.
+        '''
+        originalPiece = None
+        self.counts = [[0]*3 for i in xrange(3)]
+
+        #Weird hacky thing to get the piece from the dictionary into a variable
+        for currentPiece in graph.pieces:
+            if( str(piece) == str(currentPiece) ):
+                originalPiece = currentPiece
+                break
+
+        #Shouldn't happen, but just in case.
+        if originalPiece == None:
+            raise ValueError('The piece is not in the graph dictionary.')
+
+        for connection in graph.pieces[originalPiece]:
+            # 1 - the index gives the other index of the list of length 2
+            otherPieceIndex = 1 - connection.pieces.index(originalPiece)
+            otherPiece = connection.pieces[otherPieceIndex]
+            if( otherPiece.name == "square" ):
+                self.counts[0][connection.connectionType] += 1
+
+    def __eq__(self, other):
+        return self.counts == other.counts
 
 
+### Free Functions ###
 def makeGraph(pieces, connections):
     g = TangramsGraph()
     for piece in pieces:
