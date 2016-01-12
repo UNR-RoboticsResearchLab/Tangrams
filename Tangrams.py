@@ -16,6 +16,7 @@ MAX_SIDE_CENTER_DIST = 20
 MAX_POINT_SIDE_DIST = 20
 MAX_CENTER_DIST = 50
 MAX_ANG_DIFF = 0.5
+MAX_CONNECTION_DIST = 250
 
 class Connection:
 
@@ -226,15 +227,20 @@ class Piece:
         self.sides = [Line([fCont[i][0], fCont[(i + 1) % len(contour)][0]])
                      for i in range(len(contour))]
 
+        self.name = "NON_PIECE"
+
         #Determines the name of the piece.
         if (len(contour) == 4):
             if self.isSquare():
                 self.name = 'square'
+                self.hasSymmetry = True
             elif self.isParallelogram():
                 self.name = 'parallelogram'
+                self.hasSymmetry = True
         elif(len(contour)== 3):
             if self.isRightIsosceles():
                 self.name = 'triangle'
+                self.hasSymmetry = False
 
         if "name" in self.__dict__:
             self.theta = self.findAngleFromXaxis()
@@ -318,7 +324,7 @@ class Piece:
     def draw(self, img):
         cv2.drawContours(img, [self.contour], -1, (125, 0, 0), 1)
 
-        if "theta" in self.__dict__:
+        if "theta" in self.__dict__ and self.theta != None:
             cx, cy = self.center
 
             color = (0, 0, 255)
@@ -495,6 +501,26 @@ class Piece:
                 return False
         return True
 
+    def indentifySymmetry(self, connections):
+        """ NOTES
+            symmetrySkip is the number of sides to skip when checking different
+            configurations. A square has 4 sides and 4 way symmetry so the skip
+            number is 1. A parallelogram has 4 sides but 2 way symmetry so the 
+            skip number is 2 because 2 shifts need to be made for it to fit.
+            This is a bad explanation. TODO: make a picture explanation.
+            """
+        if self.name == "square":
+            self.symmetrySkip = 1
+        else:
+            self.symmetrySkip = 2
+
+        self.symmetryPattern = self.getSymmetryPattern(connections)
+
+    def getSymmetryPattern(self, connections):
+        """How do I get the pieces in a consistent order that represents going
+            around in a direction?
+            """
+
 def drawConnections(img, connections):
     for connection in connections:
         connection.draw(img)
@@ -507,8 +533,6 @@ def drawLines(img, pieces):
     for piece in pieces:
         for side in piece.sides[:1]:
             side.draw(img)
-
-def removeDuplicates(contours):
     centers = []
     valid = []
     #SOMETHING HERE IS WRONG NOT SURE WHAT
@@ -538,11 +562,16 @@ def findConnections(pieces):
                 center1 = np.asarray(pieces[i].center)
                 center2 = np.asarray(other.center)
                 d = dist(center1, center2)
-                if d < 250:
+                if d < MAX_CONNECTION_DIST:
                     connections.append(Connection(pieces[i], other))
     #Remove non-connections from list
     connections = [i for i in connections if i.connectionType != NON_CONNECTION]
     return connections
+
+def indentifySymmetry(pieces, connections):
+    for piece in pieces:
+        if piece.hasSymmetry:
+            piece.indentifySymmetry(connections)
 
 #Returns a list of contours from given image that should be pieces.
 def findValid(img):
@@ -558,7 +587,7 @@ def findValid(img):
         #shapeMask of pixels that fit current criteria.
         shapeMask = cv2.inRange(img, lower, upper)
         
-        #cv2.imshow(color, shapeMask)
+        cv2.imshow(color, shapeMask)
 
         ret, thresh = cv2.threshold(shapeMask, 127, 255, 0)
         _, contours, _ = cv2.findContours(thresh, cv2.RETR_TREE,
@@ -566,7 +595,7 @@ def findValid(img):
         contours = reduceToBlocks(contours)
         for cont in contours:
             valid.append(cont)
-    valid = removeDuplicates(valid)
+    #valid = removeDuplicates(valid)
     return valid
 
 # TODO Make this less lighting dependant (HSV?) Better name?
@@ -585,6 +614,25 @@ def getColors(img):
         'blue':[47,30,0]
     }
     return high, low
+
+def getColorsByKmeans(img):
+    colorCount = 4 # 3 and bg
+    height = len(img)
+    width = len(img[0])
+    pixels = img.reshape((-1,3))
+    pixels = np.float32(pixels)
+
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    ret, label, center = cv2.kmeans(pixels, colorCount + 1, None,
+                 criteria, 10, flags = cv2.KMEANS_RANDOM_CENTERS)
+    colors = []
+
+    for i in range(colorCount+1):
+        colors.append( pixels[label.flatten() == i])
+    
+    
+
+    print center
 
 #Draws the given list of pieces onto the given image.
 def drawPieces(img, pieces):

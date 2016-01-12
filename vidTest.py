@@ -13,10 +13,10 @@ def main():
         # Capture frame-by-frame
         ret, img = cap.read()
 
-        # if(frameCount%20 == 0):
-        #     valid = findValid(img)
-        #     pieces = indentifyPieces(valid, img)
-        #     connections = findConnections(pieces)
+        if(frameCount%20 == 0):
+            valid = findValid(img)
+            pieces = indentifyPieces(valid, img)
+            connections = findConnections(pieces)
 
         blank = np.zeros(img.shape)
 

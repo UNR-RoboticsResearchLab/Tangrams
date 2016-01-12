@@ -28,7 +28,7 @@ class TangramsGraph:
         self.pieces[piece2].append(connection)
 
     def __eq__(self, other):
-        return self.countsMatch(other)
+        return self.countsMatch(other) and self.symmetriesMatch(other) 
 
     """ countsMatch Description:
         Check to make sure each connection has a match on the other graph that
@@ -36,12 +36,12 @@ class TangramsGraph:
         same number of connections to the correct types.
         """
     def countsMatch(self, other):
-        """NOTES:
+        """ NOTES:
             Still fails if a piece is connected with the correct type of
             connection to the correct piece but with the wrong side/point.
 
             Uses while loops because things are being removed mid loop. Using
-            for loops in this scenario leads to 
+            for loops in this scenario leads to wierd stuff.
             """
 
         #Check to make sure graphs have same number of connections & pieces.
@@ -55,7 +55,7 @@ class TangramsGraph:
         connections = copy.deepcopy(self.connections)
         otherConnections = copy.deepcopy(other.connections)
 
-        #Loop over all connections in 
+        #Loop over all connections of the first graph.
         selfIndex = 0
         while(selfIndex < len(connections)):
             #The current connection in self being paired.
@@ -83,8 +83,9 @@ class TangramsGraph:
                     otherCounts2 = other.getPieceCounts(oConnection.pieces[1])
 
                     #If counts match remove the pair from their lists
-                    if(self.PieceCountsMatch(selfCounts1, selfCounts2,
-                                        otherCounts1, otherCounts2)):
+                    if( self.PieceCountsMatch(selfCounts1, selfCounts2,
+                                        otherCounts1, otherCounts2)
+                        ):
                         #Match Found remove connections from lists.
                         del connections[connection]
                         del otherConnections[oConnection]
@@ -108,6 +109,13 @@ class TangramsGraph:
         #print("Second Graph unmatched" + str(otherConnections.keys()))
 
         return True
+
+    """ symmetriesMatch Description:
+        Returns true if the pieces with symmetries have connections in the
+        correct locations.
+        """
+    def symmetriesMatch(self, other):
+        pass
 
     def PieceCountsMatch(self, counts1, counts2, oCounts1, oCounts2):
         if(counts1 == oCounts1 and counts2 == oCounts2):
@@ -157,6 +165,7 @@ class TangramsGraphCounts:
         '''
         originalPiece = None
         self.counts = [[0]*3 for i in xrange(3)]
+        countIndexes = ["square","triangle","parallelogram"]
 
         #Weird hacky thing to get the piece from the dictionary into a variable
         for currentPiece in graph.pieces:
@@ -168,12 +177,14 @@ class TangramsGraphCounts:
         if originalPiece == None:
             raise ValueError('The piece is not in the graph dictionary.')
 
+
         for connection in graph.pieces[originalPiece]:
             # 1 - the index gives the other index of the list of length 2
             otherPieceIndex = 1 - connection.pieces.index(originalPiece)
             otherPiece = connection.pieces[otherPieceIndex]
-            if( otherPiece.name == "square" ):
-                self.counts[0][connection.connectionType] += 1
+            if otherPiece.name in countIndexes:
+                countIndex = countIndexes.index(otherPiece.name)
+                self.counts[countIndex][connection.connectionType] += 1
 
     def __eq__(self, other):
         return self.counts == other.counts
